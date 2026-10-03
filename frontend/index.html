@@ -1,0 +1,879 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <title>SpeakMate</title>
+
+    <style>
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            min-height: 100vh;
+            font-family: Arial, sans-serif;
+            background: #0f172a;
+            color: #f8fafc;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .app {
+            width: 900px;
+            max-width: 95%;
+            height: 700px;
+            background: #111827;
+            border: 1px solid #334155;
+            border-radius: 20px;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        header {
+            padding: 22px 28px;
+            border-bottom: 1px solid #334155;
+        }
+
+        header h1 {
+            margin: 0;
+            font-size: 28px;
+        }
+
+        header p {
+            margin: 6px 0 0;
+            color: #94a3b8;
+            font-size: 17px;
+        }
+
+        .status {
+            color: #4ade80;
+            font-size: 13px;
+            margin-top: 8px;
+        }
+
+        #chat {
+            flex: 1;
+            padding: 25px;
+            overflow-y: auto;
+        }
+
+        .message {
+            margin-bottom: 18px;
+            max-width: 82%;
+            padding: 15px 18px;
+            border-radius: 14px;
+            line-height: 1.6;
+            white-space: pre-wrap;
+        }
+
+        .user {
+            margin-left: auto;
+            background: #2563eb;
+        }
+
+        .ai {
+            background: #1e293b;
+        }
+
+        .welcome {
+            color: #94a3b8;
+            text-align: center;
+            margin-top: 150px;
+        }
+
+        .input-area {
+            padding: 20px;
+            border-top: 1px solid #334155;
+            display: flex;
+            gap: 10px;
+        }
+
+        input {
+            flex: 1;
+            padding: 15px;
+            border-radius: 12px;
+            border: 1px solid #475569;
+            background: #0f172a;
+            color: white;
+            font-size: 16px;
+            outline: none;
+        }
+
+        input:focus {
+            border-color: #60a5fa;
+        }
+
+        button {
+            border: none;
+            border-radius: 12px;
+            padding: 0 20px;
+            background: #2563eb;
+            color: white;
+            font-size: 15px;
+            cursor: pointer;
+        }
+
+        button:hover {
+            background: #1d4ed8;
+        }
+
+        button:disabled {
+            opacity: 0.5;
+            cursor: wait;
+        }
+
+        #mic {
+            min-width: 58px;
+            font-size: 20px;
+            background: #334155;
+        }
+
+        #mic:hover {
+            background: #475569;
+        }
+
+        .listen-btn {
+            margin-top: 8px;
+            padding: 7px 12px;
+            border: 1px solid #475569;
+            border-radius: 8px;
+            background: #0f172a;
+            color: white;
+            cursor: pointer;
+        }
+
+        .correction {
+            margin-top: 15px;
+            padding: 12px;
+            border-left: 3px solid #60a5fa;
+            background: rgba(59, 130, 246, 0.08);
+        }
+
+        .explanation {
+            margin-top: 6px;
+            color: #94a3b8;
+            font-size: 14px;
+        }
+
+        .natural {
+            margin-top: 10px;
+            color: #4ade80;
+            font-size: 14px;
+        }
+    </style>
+</head>
+
+<body>
+
+<div class="app">
+
+    <header>
+        <h1>🗣️ SpeakMate</h1>
+
+        <p>
+            Practice Japanese before your exchange — privately
+        </p>
+
+        <div class="status">
+    🔒 Private AI · Gemma 3 4B · Local Whisper
+        </div>
+    </header>
+
+    <div style="
+    padding: 14px 20px;
+    border-bottom: 1px solid #334155;
+    display: flex;
+    gap: 8px;
+    overflow-x: auto;
+">
+
+    <button onclick="setScenario('casual')" class="scenario">
+        💬 Casual
+    </button>
+
+    <button onclick="setScenario('university')" class="scenario">
+        🎓 University
+    </button>
+
+    <button onclick="setScenario('food')" class="scenario">
+        🍜 Food
+    </button>
+
+    <button onclick="setScenario('travel')" class="scenario">
+        🚆 Travel
+    </button>
+
+    <button onclick="setScenario('friends')" class="scenario">
+        👋 Making Friends
+    </button>
+
+</div>
+
+
+    <div id="chat">
+
+        <div class="welcome">
+
+            <h2>こんにちは！ 👋</h2>
+
+            <p>
+                Type or speak in Japanese to start.
+            </p>
+
+        </div>
+
+    </div>
+
+
+    <div class="input-area">
+
+        <button
+            id="mic"
+            onclick="toggleRecording()"
+            title="Speak Japanese"
+        >
+            🎙️
+        </button>
+
+        <input
+            id="message"
+            type="text"
+            placeholder="Type or speak in Japanese..."
+            autocomplete="off"
+        >
+
+        <button
+            id="send"
+            onclick="sendMessage()"
+        >
+            Send
+        </button>
+
+    </div>
+
+</div>
+
+
+<script>
+
+const input = document.getElementById("message");
+const sendButton = document.getElementById("send");
+const micButton = document.getElementById("mic");
+const chat = document.getElementById("chat");
+
+
+// ==========================================
+// CONVERSATION MEMORY
+// ==========================================
+
+let conversationHistory = [];
+
+
+// ==========================================
+// TEXT → SPEECH
+// ==========================================
+
+function speakJapanese(text) {
+
+    if (!("speechSynthesis" in window)) {
+        return;
+    }
+
+    speechSynthesis.cancel();
+
+    const utterance =
+        new SpeechSynthesisUtterance(text);
+
+    utterance.lang = "ja-JP";
+    utterance.rate = 0.9;
+    utterance.pitch = 1.0;
+
+    speechSynthesis.speak(utterance);
+}
+
+
+// ==========================================
+// AUDIO RECORDING
+// ==========================================
+
+let mediaRecorder = null;
+let audioChunks = [];
+let isRecording = false;
+
+
+function toggleRecording() {
+
+    if (isRecording) {
+
+        stopRecording();
+
+    } else {
+
+        startRecording();
+
+    }
+
+}
+
+
+async function startRecording() {
+
+    try {
+
+        const stream =
+            await navigator.mediaDevices.getUserMedia({
+                audio: true
+            });
+
+
+        audioChunks = [];
+
+
+        mediaRecorder =
+            new MediaRecorder(stream);
+
+
+        mediaRecorder.ondataavailable =
+            function(event) {
+
+                if (event.data.size > 0) {
+
+                    audioChunks.push(
+                        event.data
+                    );
+
+                }
+
+            };
+
+
+        mediaRecorder.onstop =
+            async function() {
+
+                stream
+                    .getTracks()
+                    .forEach(
+                        track => track.stop()
+                    );
+
+
+                const audioBlob =
+                    new Blob(
+                        audioChunks,
+                        {
+                            type: "audio/webm"
+                        }
+                    );
+
+
+                await transcribeAudio(
+                    audioBlob
+                );
+
+            };
+
+
+        mediaRecorder.start();
+
+
+        isRecording = true;
+
+
+        micButton.textContent = "🔴";
+
+        micButton.title =
+            "Click to stop recording";
+
+
+    }
+
+    catch (error) {
+
+        console.error(
+            "Microphone error:",
+            error
+        );
+
+        alert(
+            "Microphone access failed. " +
+            "Please allow microphone access in Chrome."
+        );
+
+    }
+
+}
+
+
+function stopRecording() {
+
+    if (
+        !mediaRecorder ||
+        !isRecording
+    ) {
+        return;
+    }
+
+
+    mediaRecorder.stop();
+
+
+    isRecording = false;
+
+
+    micButton.textContent = "🎙️";
+
+    micButton.title =
+        "Speak Japanese";
+
+}
+
+
+// ==========================================
+// WHISPER TRANSCRIPTION
+// ==========================================
+
+async function transcribeAudio(
+    audioBlob
+) {
+
+    micButton.disabled = true;
+
+    micButton.textContent = "⏳";
+
+
+    try {
+
+        const formData =
+            new FormData();
+
+
+        formData.append(
+            "file",
+            audioBlob,
+            "speech.webm"
+        );
+
+
+        const response =
+            await fetch(
+                "http://127.0.0.1:8000/transcribe",
+                {
+                    method: "POST",
+                    body: formData
+                }
+            );
+
+
+        if (!response.ok) {
+
+            throw new Error(
+                "Transcription failed"
+            );
+
+        }
+
+
+        const data =
+            await response.json();
+
+
+        console.log(
+            "Whisper transcription:",
+            data.text
+        );
+
+
+        if (
+            data.text &&
+            data.text.trim()
+        ) {
+
+            input.value =
+                data.text.trim();
+
+
+            await sendMessage();
+
+        } else {
+
+            alert(
+                "No speech detected. " +
+                "Please try speaking a little louder."
+            );
+
+        }
+
+    }
+
+    catch (error) {
+
+        console.error(
+            "Transcription error:",
+            error
+        );
+
+
+        alert(
+            "Could not transcribe the recording."
+        );
+
+    }
+
+    finally {
+
+        micButton.disabled = false;
+
+        micButton.textContent = "🎙️";
+
+    }
+
+}
+
+
+// ==========================================
+// ADD USER MESSAGE
+// ==========================================
+
+function addUserMessage(text) {
+
+    const welcome =
+        document.querySelector(
+            ".welcome"
+        );
+
+
+    if (welcome) {
+        welcome.remove();
+    }
+
+
+    const message =
+        document.createElement("div");
+
+
+    message.className =
+        "message user";
+
+
+    message.textContent =
+        text;
+
+
+    chat.appendChild(
+        message
+    );
+
+
+    chat.scrollTop =
+        chat.scrollHeight;
+
+}
+
+
+// ==========================================
+// ADD AI MESSAGE
+// ==========================================
+
+function addAIMessage(data) {
+
+    const container =
+        document.createElement("div");
+
+
+    container.className =
+        "message ai";
+
+
+    let correctionHTML = "";
+
+
+    if (
+        data.correction &&
+        data.correction !== "None"
+    ) {
+
+        correctionHTML = `
+
+            <div class="correction">
+
+                <strong>
+                    💡 Correction
+                </strong>
+
+                <br>
+
+                ${escapeHTML(
+                    data.correction
+                )}
+
+                <div class="explanation">
+
+                    ${escapeHTML(
+                        data.explanation
+                    )}
+
+                </div>
+
+            </div>
+
+        `;
+
+    } else {
+
+        correctionHTML = `
+
+            <div class="natural">
+
+                ✓ Your Japanese looks natural!
+
+            </div>
+
+        `;
+
+    }
+
+
+    container.innerHTML = `
+
+        <div
+            style="
+                font-size:20px;
+                margin-bottom:8px;
+            "
+        >
+
+            ${escapeHTML(
+                data.reply
+            )}
+
+        </div>
+
+
+        <button
+            class="listen-btn"
+            onclick='
+                speakJapanese(
+                    ${JSON.stringify(
+                        data.reply
+                    )}
+                )
+            '
+        >
+
+            🔊 Listen
+
+        </button>
+
+
+        ${correctionHTML}
+
+    `;
+
+
+    chat.appendChild(
+        container
+    );
+
+
+    chat.scrollTop =
+        chat.scrollHeight;
+
+
+    // Automatically speak response
+
+    speakJapanese(
+        data.reply
+    );
+
+}
+
+
+// ==========================================
+// SEND MESSAGE → GEMMA
+// ==========================================
+
+async function sendMessage() {
+
+    const message =
+        input.value.trim();
+
+
+    if (!message) {
+        return;
+    }
+
+
+    addUserMessage(
+        message
+    );
+
+
+    input.value = "";
+
+
+    sendButton.disabled = true;
+
+    sendButton.textContent =
+        "Thinking...";
+
+
+    try {
+
+        const response =
+            await fetch(
+                "http://127.0.0.1:8000/chat",
+                {
+                    method: "POST",
+
+                    headers: {
+                        "Content-Type":
+                            "application/json"
+                    },
+
+                    body: JSON.stringify({
+                        message:
+                            message,
+
+                        history:
+                            conversationHistory
+                    })
+                }
+            );
+
+
+        if (!response.ok) {
+
+            throw new Error(
+                "Chat API failed"
+            );
+
+        }
+
+
+        const data =
+            await response.json();
+
+
+        addAIMessage(
+            data
+        );
+
+
+        conversationHistory.push({
+
+            role: "user",
+
+            content:
+                message
+
+        });
+
+
+        conversationHistory.push({
+
+            role: "assistant",
+
+            content:
+                data.reply
+
+        });
+
+    }
+
+    catch (error) {
+
+        console.error(
+            error
+        );
+
+
+        addAIMessage({
+
+            reply:
+                "⚠️ I couldn't connect to the local AI.",
+
+            correction:
+                "None",
+
+            explanation:
+                "Make sure Ollama and FastAPI are running."
+
+        });
+
+    }
+
+    finally {
+
+        sendButton.disabled =
+            false;
+
+        sendButton.textContent =
+            "Send";
+
+        input.focus();
+
+    }
+
+}
+
+
+// ==========================================
+// ENTER TO SEND
+// ==========================================
+
+input.addEventListener(
+    "keydown",
+    function(event) {
+
+        if (
+            event.key === "Enter"
+        ) {
+
+            sendMessage();
+
+        }
+
+    }
+);
+
+
+// ==========================================
+// BASIC HTML ESCAPING
+// ==========================================
+
+function escapeHTML(text) {
+
+    return String(text)
+        .replace(
+            /&/g,
+            "&amp;"
+        )
+        .replace(
+            /</g,
+            "&lt;"
+        )
+        .replace(
+            />/g,
+            "&gt;"
+        )
+        .replace(
+            /"/g,
+            "&quot;"
+        )
+        .replace(
+            /'/g,
+            "&#039;"
+        );
+
+}
+
+</script>
+
+</body>
+</html>
